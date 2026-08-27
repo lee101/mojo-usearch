@@ -83,6 +83,17 @@ def test_simd_tail_and_parallel_threshold_are_deterministic():
         assert np.array_equal(result.keys, serial.keys)
         assert np.allclose(result.distances, serial.distances, rtol=2e-5, atol=2e-5)
 
+    small_vectors = vectors[:64]
+    small = MojoIndex(ndim=31, metric="cos", dtype="f32")
+    small.add(np.arange(len(small_vectors), dtype=np.uint64), small_vectors)
+    small_serial = small.search(queries[:2], count=7, exact=True, threads=1)
+    small_automatic = small.search(queries[:2], count=7, exact=True)
+    assert np.array_equal(small_automatic.keys, small_serial.keys)
+    assert np.allclose(
+        small_automatic.distances, small_serial.distances,
+        rtol=2e-5, atol=2e-5,
+    )
+
 
 def test_radius_and_empty_index_behaviour(vectors):
     index = MojoIndex(ndim=vectors.shape[1], metric="l2sq")

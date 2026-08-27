@@ -1,9 +1,12 @@
 """SIMD exact-search kernels exposed through a stable C ABI."""
 
+from max.algorithm import parallelize
 from std.math import sqrt
 from std.sys.info import simd_width_of as simdwidthof
 
 comptime W = simdwidthof[DType.float32]()
+comptime PARALLEL_WORK_THRESHOLD = 262144
+comptime AUTO_WORKERS = 24
 comptime Ptr = Pointer[Float32, AnyOrigin[mut=True]]
 comptime IndexPtr = Pointer[Int64, AnyOrigin[mut=True]]
 
@@ -217,6 +220,23 @@ def mus_search_f32(
     var query = Ptr(unsafe_from_address=queries_addr)
     var positions = IndexPtr(unsafe_from_address=positions_addr)
     var distances = Ptr(unsafe_from_address=distances_addr)
-    for q in range(queries):
-        search_one(vectors, query, positions, distances, rows, dimensions, count, metric, radius, q)
+    @__parameter
+    def search_query(q: Int):
+        search_one(
+            vectors, query, positions, distances, rows, dimensions,
+            count, metric, radius, q,
+        )
+
+    var worker_count = workers
+    if worker_count <= 0:
+        worker_count = AUTO_WORKERS
+    worker_count = min(worker_count, queries)
+    if (
+        worker_count > 1
+        and rows * dimensions >= PARALLEL_WORK_THRESHOLD // queries
+    ):
+        parallelize[search_query](queries, worker_count)
+    else:
+        for q in range(queries):
+            search_query(q)
     return 0

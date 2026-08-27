@@ -64,6 +64,11 @@ parallel; small searches stay serial to avoid task-launch overhead. Python maps
 positions back to user keys. There are no allocations in the Mojo kernel, and
 the buffer lifetime remains Python's responsibility.
 
+The exact distance scans are memory-bandwidth-bound: inner product does about
+0.25 FLOPs per byte loaded, L2 about 0.375, and cosine about 0.5.
+That is well below the roughly 2 FLOPs/byte threshold where a discrete GPU can
+repay transfer and launch costs, so this port intentionally has no GPU path.
+
 ## Correctness
 
 The test suite installs the real PyPI `usearch` package and compares exact
@@ -83,9 +88,9 @@ its mature vector kernels, so it remains faster here.
 
 | case | mojo-usearch | upstream usearch | ratio | result |
 | --- | ---: | ---: | ---: | --- |
-| exact l2sq, 12k x 128, 96 queries | 8.9 ms | 6.4 ms | 0.72x | slower |
-| exact cos, 12k x 128, 96 queries | 9.5 ms | 7.3 ms | 0.77x | slower |
-| exact ip, 12k x 128, 96 queries | 10.0 ms | 6.4 ms | 0.64x | slower |
+| exact l2sq, 12k x 128, 96 queries | 7.7 ms | 6.5 ms | 0.84x | slower |
+| exact cos, 12k x 128, 96 queries | 7.7 ms | 7.1 ms | 0.92x | slower |
+| exact ip, 12k x 128, 96 queries | 7.4 ms | 6.3 ms | 0.86x | slower |
 
 Run it under Pixi so the task's machine-wide benchmark lock is held:
 
